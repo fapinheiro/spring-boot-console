@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+payload.txt
+newpayload.txt
+application*.yml
+.mvn/
