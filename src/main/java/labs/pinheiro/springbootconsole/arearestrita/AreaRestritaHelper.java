@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,7 +28,7 @@ public class AreaRestritaHelper {
      * Le arquivo, identifica idDocumento, consulta timeline da cota e identifica quais cotas estao com ultimo evento igual ao evento passado por parametro.
      * Gera novo arquivo contendo apenas as cotas no padrao identificado.
      */
-    public void gerarCotasComUltimoEventoTimelinePorArquivo(String arquivo, String evento, Boolean isDplTopic) throws Exception {
+    public void gerarCotasComUltimoEventoTimelinePorArquivo(String arquivo, List<String> eventos, Boolean isDplTopic) throws Exception {
 
         Path path = Paths.get("src/main/resources/" + arquivo);
 
@@ -45,19 +46,25 @@ public class AreaRestritaHelper {
             
             // aplicar filtros
             final String dtOperacao = getField(line, "DT_OPERACAO");
-            if (dtOperacao.contains("23-05-2025")) {
+            if (dtOperacao.contains("22-05-2025") || dtOperacao.contains("23-05-2025") || dtOperacao.contains("24-05-2025") || dtOperacao.contains("25-05-2025")
+                || dtOperacao.contains("26-05-2025") || dtOperacao.contains("27-05-2025") || dtOperacao.contains("28-05-2025")
+                || dtOperacao.contains("29-05-2025") || dtOperacao.contains("30-05-2025") || dtOperacao.contains("31-05-2025") || dtOperacao.contains("01-06-2025")
+                || dtOperacao.contains("02-06-2025") )  {
                 // Ok
             } else {
                 continue;
             }
 
             try {
-                CotaTimelineDTO dto = this.timelineService.getTimelineCotaByDocumento(idDocumento, idEmpresa, idTipoDocumento, idUnidade, idComissionado, "todos", null);
-                if (evento.equalsIgnoreCase(dto.getTimeline().get(0).getEvento())) {
 
-                    // Validar somente as cotas que estao com status diferente do ultimo evento da timeline
+                // Obtem eventos da timeline
+                CotaTimelineDTO dto = this.timelineService.getTimelineCotaByDocumento(idDocumento, idEmpresa, idTipoDocumento, idUnidade, idComissionado, "todos", null);
+                if (eventos.contains(dto.getTimeline().get(0).getEvento())) {
+
+                    // Consulta a cota para ver se a cota está com o ultimo status da timeline
+                    // Se a cota esta igual a timeline, ignorar pois os dados já estao corretos
                     final Cota cota = this.timelineService.getCotaByIdCota(dto.getCota().getIdCota());
-                    if (cota != null && cota.getEvento().equalsIgnoreCase(evento)) continue;
+                    if (cota != null && eventos.contains(cota.getEvento())) continue;
                    
                     // Preparar payload de envio
                     String lineStr = dto.getTimeline().get(0).getIdEvento() + ":" + line.substring(line.indexOf(":") + 1) + "\n";

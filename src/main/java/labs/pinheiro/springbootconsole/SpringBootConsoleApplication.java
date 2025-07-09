@@ -1,6 +1,6 @@
 package labs.pinheiro.springbootconsole;
 
-import java.util.Date;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -27,7 +27,7 @@ public class SpringBootConsoleApplication implements CommandLineRunner {
 	public void run(String... args) throws Exception {
 
 		// System.out.print(teste.replaceAll("\"DT_PROCESSADO\": {\"int\": [0-9]*}", ""));
-		areaRestritaHelper.gerarCotasComUltimoEventoTimelinePorArquivo("payload.txt",  TimelineServiceImpl.COTA_ALOCADA, false);
+		areaRestritaHelper.gerarCotasComUltimoEventoTimelinePorArquivo("payload.txt",  List.of(TimelineServiceImpl.COTA_CONTEMPLADA_LANCE, TimelineServiceImpl.COTA_CONTEMPLADA_SORTEIO) , false);
 		
 		// areaRestritaHelper.gerarEventoUnico("payload.txt");
 
