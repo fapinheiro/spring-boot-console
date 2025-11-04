@@ -17,7 +17,9 @@ import labs.pinheiro.springbootconsole.arearestrita.dto.CotaTimelineDTO;
 import labs.pinheiro.springbootconsole.arearestrita.entity.Cota;
 import labs.pinheiro.springbootconsole.arearestrita.exception.NotFoundInfoException;
 import labs.pinheiro.springbootconsole.arearestrita.service.TimelineService;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class AreaRestritaHelper {
     
@@ -45,15 +47,15 @@ public class AreaRestritaHelper {
             final String idComissionado = getField(line, "ID_COMISSIONADO");
             
             // aplicar filtros
-            final String dtOperacao = getField(line, "DT_OPERACAO");
-            if (dtOperacao.contains("22-05-2025") || dtOperacao.contains("23-05-2025") || dtOperacao.contains("24-05-2025") || dtOperacao.contains("25-05-2025")
-                || dtOperacao.contains("26-05-2025") || dtOperacao.contains("27-05-2025") || dtOperacao.contains("28-05-2025")
-                || dtOperacao.contains("29-05-2025") || dtOperacao.contains("30-05-2025") || dtOperacao.contains("31-05-2025") || dtOperacao.contains("01-06-2025")
-                || dtOperacao.contains("02-06-2025") )  {
-                // Ok
-            } else {
-                continue;
-            }
+            // final String dtOperacao = getField(line, "DT_OPERACAO");
+            // if (dtOperacao.contains("22-05-2025") || dtOperacao.contains("23-05-2025") || dtOperacao.contains("24-05-2025") || dtOperacao.contains("25-05-2025")
+            //     || dtOperacao.contains("26-05-2025") || dtOperacao.contains("27-05-2025") || dtOperacao.contains("28-05-2025")
+            //     || dtOperacao.contains("29-05-2025") || dtOperacao.contains("30-05-2025") || dtOperacao.contains("31-05-2025") || dtOperacao.contains("01-06-2025")
+            //     || dtOperacao.contains("02-06-2025") )  {
+            //     // Ok
+            // } else {
+            //     continue;
+            // }
 
             try {
 
@@ -90,7 +92,8 @@ public class AreaRestritaHelper {
                         Files.writeString(pathNew, lineStr);    
                         isFirst = false;
                     } 
-
+                } else {
+                    log.warn(String.format("Nao foi localizado eventos para idDocumento: %s idEmpresa: %s e idTipoDocumento: %s", idDocumento, idEmpresa, idTipoDocumento));
                 }
             } catch (NotFoundInfoException e) {
                 // Ok, nada aqui.
@@ -153,6 +156,82 @@ public class AreaRestritaHelper {
                 Files.writeString(pathNew, lineStr);    
                 isFirst = false;
             } 
+
+        }
+        
+    }
+
+    /*
+     * Le arquivo, identifica idDocumento, consulta timeline da cota, localiza o evento solicitado e monta payload dpl
+     */
+    public void gerarPayloadDPL(String arquivo, String eventos) throws Exception {
+
+        Path path = Paths.get("src/main/resources/" + arquivo);
+
+        Path pathNew = Paths.get("src/main/resources/new" + arquivo);
+
+        boolean isFirst = true;
+    
+        for (String line : Files.readAllLines(path)) {
+
+            final String idDocumento = getField(line, "ID_DOCUMENTO");
+            final String idEmpresa = getField(line, "ID_EMPRESA");
+            final String idTipoDocumento = getField(line, "ID_TIPO_DOCUMENTO");
+            final String idUnidade = getField(line, "ID_UNIDADE_NEGOCIO");
+            final String idComissionado = getField(line, "ID_COMISSIONADO");
+            
+            // aplicar filtros
+            // final String dtOperacao = getField(line, "DT_OPERACAO");
+            if (idUnidade.equalsIgnoreCase("103"))  {
+                // Ok
+            } else {
+                continue;
+            }
+
+            try {
+
+                // Obtem eventos da timeline
+                CotaTimelineDTO dto = this.timelineService.getTimelineCotaByDocumento(idDocumento, idEmpresa, idTipoDocumento, idUnidade, idComissionado, "todos", null);
+                
+                // Filtrar eventos da jornada
+                // if (eventos.contains(dto.getTimeline().get(0).getEvento())) {
+                if (eventos.contains(dto.getTimeline().get(dto.getTimeline().size()-1).getEvento())) {
+
+                    // // Consulta a cota para ver se a cota está com o ultimo status da timeline
+                    // // Se a cota esta igual a timeline, ignorar pois os dados já estao corretos
+                    // final Cota cota = this.timelineService.getCotaByIdCota(dto.getCota().getIdCota());
+                    // if (cota != null && eventos.contains(cota.getEvento())) continue;
+                   
+                    // Preparar payload de envio
+                    // String lineStr = dto.getTimeline().get(0).getIdEvento() + ":" + line.substring(line.indexOf(":") + 1) + "\n";
+                    // if (!isDplTopic) {
+
+                        // Topico nao DPL a data vem no formato "DT_PROCESSADO": {"string": "23-05-2025"}
+                        // DPL topico a data deve estar no formato "DT_PROCESSADO": {"string": "2025-05-25T00:00:00Z"}
+                        final String dtProcessado = getField(line, "DT_PROCESSADO");
+                        final String dtProcessadoNew = String.format("\"DT_PROCESSADO\" : \\{ \"string\" : \"%s-%s-%sT00:00:00Z\" \\}", 
+                            dtProcessado.substring(6),
+                            dtProcessado.substring(3, 5),
+                            dtProcessado.substring(0, 2)
+                            );
+                        final String lineDtProcessadoReplaced = line.replaceAll("\"DT_PROCESSADO\"\\s*:\\s*\\{\\s*\"string\"\\s*:\\s*\"" + dtProcessado + "\"\\s*\\}", dtProcessadoNew);
+                        String lineStr = dto.getTimeline().get(0).getIdEvento() + ":" + lineDtProcessadoReplaced.substring(lineDtProcessadoReplaced.indexOf(":") + 1) + "\n";
+                    // } 
+
+                    if (!isFirst) {
+                        Files.writeString(pathNew, lineStr, StandardOpenOption.APPEND);
+                    }
+
+                    if (isFirst) {
+                        Files.writeString(pathNew, lineStr);    
+                        isFirst = false;
+                    } 
+                } else {
+                    log.warn(String.format("Nao foi localizado eventos para idDocumento: %s idEmpresa: %s e idTipoDocumento: %s", idDocumento, idEmpresa, idTipoDocumento));
+                }
+            } catch (NotFoundInfoException e) {
+                // Ok, nada aqui.
+            }
 
         }
         
